@@ -24,7 +24,6 @@
 #include <algorithm>
 #include <iostream>
 #include <map>
-#include <numeric>
 #include <regex>
 #include <string>
 #include <tuple>
@@ -52,8 +51,9 @@ static constexpr auto kVersion = "v0.1.0";
 static constexpr auto kProgramName = "OPNA_2: Sturm's Theorem Evaluator";
 static constexpr auto kUnderlineType = '-';
 
-// -- CHANGE THESE TYPES FOR MORE PRECISION
 namespace mp = boost::multiprecision;
+
+// -- CHANGE THESE TYPES FOR MORE PRECISION
 using IntType = mp::int1024_t;
 using Fraction = boost::rational<IntType>;
 using CoefficientType = Fraction;
@@ -65,15 +65,9 @@ struct Config {
 };
 static const Config kDefaultConfig;
 
-/// Retrieves program's base name from the exec path
-static const char *GetProgramName(const char *path) {
-    const char *last = path;
-    while (*path++) {
-        last = (*path == '/' || *path == '\\') ? path : last;
-    }
-    return last;
-}
-
+/// Converts polynomial to human readable string representation
+/// \param polynomial
+/// \return std::string
 std::string PolynomialToHumanString(const Polynomial &polynomial) {
     if (polynomial.size() == 0) {
         return std::string("");
@@ -102,19 +96,6 @@ std::string PolynomialToHumanString(const Polynomial &polynomial) {
         }
     }
     return oss.str();
-}
-
-Polynomial GetDerivative(const Polynomial &polynomial) {
-    if (polynomial.size() <= 1) {
-        return Polynomial{};
-    }
-
-    auto derivative = Polynomial(std::next(polynomial.data().begin()), polynomial.data().end());
-    for (PowerType power = 1; power <= derivative.size(); power++) {
-        derivative[power - 1] = power * derivative[power - 1];
-    }
-
-    return derivative;
 }
 
 /// Performs substring operation with range check without throwing errors
@@ -147,6 +128,9 @@ Fraction DecimalToFraction(std::string number) {
     return Fraction(numerator, denominator);
 }
 
+/// Parse Fraction from fraction string
+/// \param fraction_string
+/// \return Fraction
 Fraction FractionFromString(const std::string &fraction_string) {
     std::smatch match;
     if (std::regex_match(fraction_string, match, std::regex("^([0-9.]+)/([0-9.]+)$"))) {
@@ -162,6 +146,9 @@ Fraction FractionFromString(const std::string &fraction_string) {
     }
 }
 
+/// Parse polynomial from polynomial string
+/// \param polynomial_string
+/// \return Polynomial
 Polynomial ParsePolynomial(std::string polynomial_string) {
     static const auto kVariableExtractionRegex = std::regex(
             "([+-]?(?:(?:[0-9/.]+x\\^[0-9/.]+)|(?:[0-9/.]+x)|(?:[0-9/.]+)|(?:x)))");
@@ -217,6 +204,25 @@ Polynomial ParsePolynomial(std::string polynomial_string) {
     return Polynomial{};
 }
 
+/// Calculates first derivative of given polynomial
+/// \param polynomial
+/// \return Polynomial of first derivative
+Polynomial GetDerivative(const Polynomial &polynomial) {
+    if (polynomial.size() <= 1) {
+        return Polynomial{};
+    }
+
+    auto derivative = Polynomial(std::next(polynomial.data().begin()), polynomial.data().end());
+    for (PowerType power = 1; power <= derivative.size(); power++) {
+        derivative[power - 1] = power * derivative[power - 1];
+    }
+
+    return derivative;
+}
+
+/// Generate Sturm's sequence by applying Sturm's theorem on given polynomial
+/// \param polynomial
+/// \return Vector of polynomials
 std::vector<Polynomial> SturmSequence(const Polynomial &polynomial) {
     std::vector<Polynomial> iterations;
     iterations.push_back(polynomial);
@@ -232,6 +238,10 @@ std::vector<Polynomial> SturmSequence(const Polynomial &polynomial) {
     return iterations;
 }
 
+/// Generate sign sequence from given Sturm's sequence
+/// \param sturm_sequence
+/// \param alpha Point for which to evaluate sequence
+/// \return Vector of signs (booleans), where (true, false) maps to (+,-)
 std::vector<bool> SignSequence(const std::vector<Polynomial> &sturm_sequence, IntType alpha) {
     std::vector<bool> sign_sequence;
     sign_sequence.reserve(sturm_sequence.size());
@@ -242,6 +252,9 @@ std::vector<bool> SignSequence(const std::vector<Polynomial> &sturm_sequence, In
     return sign_sequence;
 }
 
+/// Calculate number of sign variations from sign sequence
+/// \param sign_sequence
+/// \return Number of sign variations
 IntType SignVariations(const std::vector<bool> &sign_sequence) {
     if (sign_sequence.size() <= 1) {
         return sign_sequence.size();
@@ -253,6 +266,15 @@ IntType SignVariations(const std::vector<bool> &sign_sequence) {
         }
     }
     return sign_variations;
+}
+
+/// Retrieves program's base name from the exec path
+static const char *GetProgramName(const char *path) {
+    const char *last = path;
+    while (*path++) {
+        last = (*path == '/' || *path == '\\') ? path : last;
+    }
+    return last;
 }
 
 #ifdef TESTING_ENABLED
@@ -304,6 +326,9 @@ TEST_CASE("Sturm iterations"){
 
 #else
 
+/// Pretty print sign sequence
+/// \param sign_sequence
+/// \return
 std::string SignSequenceToString(const std::vector<bool> &sign_sequence) {
     std::ostringstream oss;
     oss << '(';
