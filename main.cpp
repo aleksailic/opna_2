@@ -347,13 +347,14 @@ TEST_CASE("GetProgramName") {
 
 TEST_CASE("Polynomial conversions") {
     const auto kPolynomialTests = std::vector<std::pair<std::string, Polynomial>>{
+            std::make_pair("x^6-4x^3+x-2", Polynomial{-2, 1, 0, -4, 0, 0, 1}),
             std::make_pair("x^4+x^3-x-1", Polynomial{-1, -1, 0, 1, 1}),
             std::make_pair("-x^4+x^3-x-1", Polynomial{-1, -1, 0, 1, -1}),
-            std::make_pair("-1/2x^2", Polynomial{ 0/1, 0/1, Fraction(-1,2) }),
-            std::make_pair("4x^3+3x^2-1", Polynomial{ -1, 0, 3, 4}),
-            std::make_pair("3/16x^2+3/4x+15/16", Polynomial{ Fraction(15,16), Fraction(3,4), Fraction(3,16)}),
-            std::make_pair("-32x-64", Polynomial{ -64, -32}),
-            std::make_pair("-3/16", Polynomial{Fraction(-3,16)})
+            std::make_pair("-1/2x^2", Polynomial{0 / 1, 0 / 1, Fraction(-1, 2)}),
+            std::make_pair("4x^3+3x^2-1", Polynomial{-1, 0, 3, 4}),
+            std::make_pair("3/16x^2+3/4x+15/16", Polynomial{Fraction(15, 16), Fraction(3, 4), Fraction(3, 16)}),
+            std::make_pair("-32x-64", Polynomial{-64, -32}),
+            std::make_pair("-3/16", Polynomial{Fraction(-3, 16)})
     };
     for (const auto &[polynomial_string, expected_result] : kPolynomialTests) {
         const auto parsed_polynomial = ParsePolynomial(polynomial_string);
@@ -361,16 +362,17 @@ TEST_CASE("Polynomial conversions") {
         REQUIRE(polynomial_string == PolynomialToHumanString(parsed_polynomial));
     }
 }
-TEST_CASE("Sturm iterations"){
+
+TEST_CASE("Sturm iterations") {
     constexpr auto kPolynomialString = "x^4+x^3-x-1";
     constexpr auto kRangeFrom = -5;
     constexpr auto kRangeTo = 5;
     const auto kExpectedIterations = std::vector<Polynomial>{
-        ParsePolynomial(kPolynomialString),
-        ParsePolynomial("4x^3+3x^2-1"),
-        ParsePolynomial("3/16x^2+3/4x+15/16"),
-        ParsePolynomial("-32x-64"),
-        ParsePolynomial("-3/16")
+            ParsePolynomial(kPolynomialString),
+            ParsePolynomial("4x^3+3x^2-1"),
+            ParsePolynomial("3/16x^2+3/4x+15/16"),
+            ParsePolynomial("-32x-64"),
+            ParsePolynomial("-3/16")
     };
     constexpr auto kExpectedEvaluationFrom = 3;
     constexpr auto kExpectedEvaluationTo = 1;
