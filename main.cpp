@@ -30,6 +30,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/math/tools/polynomial.hpp>
+#include <boost/math/tools/polynomial_gcd.hpp>
 #include <boost/optional.hpp>
 #include <boost/rational.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
@@ -220,6 +221,61 @@ Polynomial GetDerivative(const Polynomial &polynomial) {
     return derivative;
 }
 
+/**
+* Boost implementation, with minor alteration to work with rational polynomials,
+* of Knuth, The Art of Computer Programming: Volume 2, Third edition, 1998
+* Algorithm 4.6.1C: Greatest common divisor over a unique factorization domain.
+*
+* The subresultant algorithm by George E. Collins [JACM 14 (1967), 128-142],
+* later improved by W. S. Brown and J. F. Traub [JACM 18 (1971), 505-514].
+*
+* Although step C3 keeps the coefficients to a "reasonable" size, they are
+* still potentially several binary orders of magnitude larger than the inputs.
+* Thus, this algorithm should only be used with a multi-precision type.
+*
+* @param    u   First polynomial.
+* @param    v   Second polynomial.
+* @return       Greatest common divisor of polynomials u and v.
+*/
+Polynomial SubresultantGcd(Polynomial u, Polynomial v) {
+    namespace detail = boost::math::tools::detail;
+    using std::swap;
+    BOOST_ASSERT(u || v);
+
+    if (!u)
+        return v;
+    if (!v)
+        return u;
+
+    using N = Polynomial::size_type;
+
+    if (u.degree() < v.degree())
+        swap(u, v);
+
+    const CoefficientType d = detail::reduce_to_primitive(u, v);
+    CoefficientType g = 1, h = 1;
+    Polynomial r;
+    while (true) {
+        BOOST_ASSERT(u.degree() >= v.degree());
+        // Pseudo-division.
+        r = u % v;
+        if (!r)
+            return d * primitive_part(v); // Attach the content.
+        if (r.degree() == 0)
+            return d * Polynomial(CoefficientType(1)); // The content is the result.
+        N const delta = u.degree() - v.degree();
+        // Adjust remainder.
+        u = v;
+        v = r / (g * detail::integer_power(h, delta));
+        g = leading_coefficient(u);
+        CoefficientType const tmp = detail::integer_power(g, delta);
+        if (delta <= N(1))
+            h = tmp * detail::integer_power(h, N(1) - delta);
+        else
+            h = tmp / detail::integer_power(h, delta - N(1));
+    }
+}
+
 /// Generate Sturm's sequence by applying Sturm's theorem on given polynomial
 /// \param polynomial
 /// \return Vector of polynomials
@@ -347,7 +403,7 @@ int main(int argc, const char *argv[]) {
 
     Config config = kDefaultConfig;
     auto program_name = GetProgramName(argv[0]);
-    std::string polynomial;
+    std::string polynomial_string;
     std::string table_style;
     std::string fields;
     IntType range[2];
@@ -358,15 +414,16 @@ int main(int argc, const char *argv[]) {
             ("help", "print help message")
             ("version", "print version information")
             ("examples", "show examples")
+            ("gcd", "apply on P(x)/Q(x) where Q(x)=GCD(P(x),P'(x))")
             ("verbose", "detailed output of every step")
             ("table_style", po::value<std::string>(&table_style),
              "Specify table style for verbose output: nice|double|simple|empty")
-            ("polynomial", po::value<std::string>(&polynomial), "polynomial to be parsed")
+            ("polynomial_string", po::value<std::string>(&polynomial_string), "polynomial_string to be parsed")
             ("from", po::value<IntType>(&range[0]), "interval from")
             ("to", po::value<IntType>(&range[1]), "interval to");
 
     po::positional_options_description pos_desc;
-    pos_desc.add("polynomial", 1);
+    pos_desc.add("polynomial_string", 1);
     pos_desc.add("from", 1);
     pos_desc.add("to", 1);
 
@@ -418,7 +475,7 @@ int main(int argc, const char *argv[]) {
         return 0;
     }
 
-    if (!vm.count("polynomial")) {
+    if (!vm.count("polynomial_string")) {
         std::cerr << "You need to specify a polynomial. Use --help for usage information \n";
         return 1;
     }
@@ -438,7 +495,26 @@ int main(int argc, const char *argv[]) {
         }
     }
 
-    const auto sturm_sequence = SturmSequence(ParsePolynomial(polynomial));
+    auto polynomial = ParsePolynomial(polynomial_string);
+
+    if (vm.count("gcd")) {
+        const auto derivative = GetDerivative(polynomial);
+        const auto gcd = SubresultantGcd(polynomial, derivative);
+
+        fort::char_table table;
+        table.set_border_style(config.table_style);
+        table << fort::header << "P(x)" << "P'(x)" << "GCD(P(x),P'(x))" << fort::endr;
+        table << PolynomialToHumanString(polynomial)
+              << PolynomialToHumanString(derivative)
+              << PolynomialToHumanString(gcd)
+              << fort::endr;
+        std::cout << table.c_str()
+                  << std::endl;
+
+        polynomial = polynomial / gcd;
+    }
+
+    const auto sturm_sequence = SturmSequence(polynomial);
     const auto sign_sequences = std::vector<std::vector<bool>>{SignSequence(sturm_sequence, range[0]),
                                                                SignSequence(sturm_sequence, range[1])};
     const auto sign_variations = std::vector<IntType>{SignVariations(sign_sequences[0]),
@@ -451,7 +527,7 @@ int main(int argc, const char *argv[]) {
         table << fort::header << "Sturm sequence" << fort::endr;
         for (size_t i = 0; i < sturm_sequence.size(); i++) {
             std::ostringstream oss;
-            oss << "p" << i << "(x) = " << PolynomialToHumanString(sturm_sequence[i]);
+            oss << "P" << i << "(x) = " << PolynomialToHumanString(sturm_sequence[i]);
             table << oss.str() << fort::endr;
         }
         std::cout << table.c_str();
