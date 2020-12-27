@@ -31,6 +31,7 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/math/tools/polynomial.hpp>
+#include <boost/optional.hpp>
 #include <boost/rational.hpp>
 #include <boost/multiprecision/cpp_dec_float.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
@@ -116,14 +117,46 @@ Polynomial GetDerivative(const Polynomial &polynomial) {
     return derivative;
 }
 
+/// Performs substring operation with range check without throwing errors
+/// \param string String to be processed
+/// \param position Position from which to extract
+/// \param length How many characters are to be processed
+/// \return Extracted substring if range check passes or boost::none
+boost::optional<std::string>
+SafeSubstring(const std::string &string, size_t position, size_t length = std::string::npos) {
+    if (position >= string.length())
+        return boost::none;
+    else
+        return string.substr(position, length);
+}
+
+/// Parse decimal number string as fraction
+/// \param number Number to be parsed
+/// \return Corresponding fraction
+Fraction DecimalToFraction(std::string number) {
+    auto dot_index = number.find('.');
+    if (dot_index == std::string::npos) {
+        return Fraction(IntType(number), 1);
+    }
+    std::string before_point = number.substr(0, dot_index);
+    std::string after_point = SafeSubstring(number, dot_index + 1).get_value_or("");
+
+    auto numerator = IntType(before_point + after_point);
+    auto denominator = mp::pow(IntType(10), after_point.size());
+
+    return Fraction(numerator, denominator);
+}
+
 Fraction FractionFromString(const std::string &fraction_string) {
     std::smatch match;
-    if (std::regex_match(fraction_string, match, std::regex("^([0-9]+)/([0-9]+)$"))) {
+    if (std::regex_match(fraction_string, match, std::regex("^([0-9.]+)/([0-9.]+)$"))) {
         assert(match.size() == 3);
-        return Fraction(IntType(match[1].str()), IntType(match[2].str()));
-    } else if (std::regex_match(fraction_string, match, std::regex("^([0-9]+)$"))) {
+        Fraction numerator = DecimalToFraction(match[1].str());
+        Fraction denominator = DecimalToFraction(match[2].str());
+        return numerator / denominator;
+    } else if (std::regex_match(fraction_string, match, std::regex("^([0-9.]+)$"))) {
         assert(match.size() == 2);
-        return Fraction(IntType(match[1].str()), 1);
+        return DecimalToFraction(match[1].str());
     } else {
         throw std::invalid_argument("Ill-formatted fraction: " + fraction_string);
     }
@@ -131,10 +164,10 @@ Fraction FractionFromString(const std::string &fraction_string) {
 
 Polynomial ParsePolynomial(std::string polynomial_string) {
     static const auto kVariableExtractionRegex = std::regex(
-            "([+-]?(?:(?:[0-9/]+x\\^[0-9/]+)|(?:[0-9/]+x)|(?:[0-9/]+)|(?:x)))");
-    static const auto kVariableWithoutPowerRegex = std::regex("^[+-]?([0-9/]+)x$");
-    static const auto kVariableWithPowerRegex = std::regex("^[+-]?([0-9/]+)x\\^([0-9]+)$");
-    static const auto kConstantRegex = std::regex("^[+-]?([0-9/]+)$");
+            "([+-]?(?:(?:[0-9/.]+x\\^[0-9/.]+)|(?:[0-9/.]+x)|(?:[0-9/.]+)|(?:x)))");
+    static const auto kVariableWithoutPowerRegex = std::regex("^[+-]?([0-9/.]+)x$");
+    static const auto kVariableWithPowerRegex = std::regex("^[+-]?([0-9/.]+)x\\^([0-9]+)$");
+    static const auto kConstantRegex = std::regex("^[+-]?([0-9/.]+)$");
 
     for (size_t it = polynomial_string.find('x'); it != std::string::npos; it = polynomial_string.find('x', ++it)) {
         if (it == 0 || !std::isdigit(polynomial_string[it - 1])) {
@@ -265,8 +298,8 @@ TEST_CASE("Sturm iterations"){
     constexpr auto kExpectedEvaluationTo = 1;
     auto iterations = SturmSequence(ParsePolynomial(kPolynomialString));
     REQUIRE(kExpectedIterations == iterations);
-    REQUIRE(kExpectedEvaluationFrom == EvaluateSturmSequence(iterations, kRangeFrom));
-    REQUIRE(kExpectedEvaluationTo == EvaluateSturmSequence(iterations, kRangeTo));
+    REQUIRE(kExpectedEvaluationFrom == SignVariations(SignSequence(iterations, kRangeFrom)));
+    REQUIRE(kExpectedEvaluationTo == SignVariations(SignSequence(iterations, kRangeTo)));
 }
 
 #else
