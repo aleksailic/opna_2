@@ -48,7 +48,7 @@
 
 #include <fort.hpp>
 
-static constexpr auto kVersion = "v0.1.0";
+static constexpr auto kVersion = "v0.1.1";
 static constexpr auto kProgramName = "OPNA_2: Sturm's Theorem Evaluator";
 static constexpr auto kUnderlineType = '-';
 
@@ -461,7 +461,7 @@ int main(int argc, const char *argv[]) {
         const std::vector<std::tuple<std::string, std::string>> examples = {
                 std::make_tuple("x^4+x^3-x-1 -5 5", "Evaluate P(x) = x^4+x^3-x-1 with Sturm's theorem on range (-5,5]"),
                 std::make_tuple("x^4+x^3-x-1 -5 5 --verbose", "Same as above but with detailed output of every step"),
-                std::make_tuple("1/2x^2-5", "Fractions are supported as well"),
+                std::make_tuple("1/2x^2-5.0", "Fractions and floats are supported as well"),
                 std::make_tuple("x^3+x^5+2x^3", "Mixed ordering and repeating of the same element is allowed")
         };
 
@@ -551,7 +551,7 @@ int main(int argc, const char *argv[]) {
         fort::char_table table;
         table.set_border_style(config.table_style);
         table << fort::header
-              << "Number of real roots of p0(x) on interval (" + range[0].str() + ',' + range[1].str() + ']'
+              << "Number of real roots of P0(x) on interval (" + range[0].str() + ',' + range[1].str() + ']'
               << fort::endr;
         table << ("V(" + range[0].str() + ") - V(" + range[1].str() + ") = " + number_of_roots.str()) << fort::endr;
         std::cout << table.c_str();
