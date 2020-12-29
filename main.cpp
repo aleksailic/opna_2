@@ -42,8 +42,6 @@
 
 #include <catch.hpp>
 #include <prettyprint.hpp>
-
-#else
 #endif
 
 #include <fort.hpp>
